@@ -13,6 +13,8 @@ project.lock.json
 
 /packages
 /TestResults
+.vscode/*
+*.exe
 
 /tools/NuGet.exe
 /App_Data

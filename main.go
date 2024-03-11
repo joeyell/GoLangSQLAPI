@@ -24,14 +24,15 @@ func main() {
 		})
 	})
 
-	// Retrieve count of crew members
-	router.GET("/api/count", handleCount)
+	// GET count of crew members
+	router.GET("/api/count", getCount)
 
-	// Retrieve crew member information
-	router.GET("/api/crew", handleEntireCrew)
+	// GET and POST crew member information
+	router.GET("/api/crew", getEntireCrew)
+	router.POST("/api/crew", postCrew)
 
-	// Retrieve crew member information
-	router.GET("/api/crew/:id", handleCrewMember)
+	// GET crew member information
+	router.GET("/api/crew/:id", getCrewMember)
 
 	port := get_port()
 	router.Run(port)

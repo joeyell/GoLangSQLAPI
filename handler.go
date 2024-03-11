@@ -5,12 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/microsoft/go-mssqldb"
 )
+
+type Config struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
 
 type crewMemberInfo struct {
 	Crew_id string         `json:"crew_id"`
@@ -23,16 +29,11 @@ type crewMemberData struct {
 	Rank string `json:"rank"`
 }
 
-type Config struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 type entireCompliment []crewMemberInfo
 
 var db *sql.DB
 
-func handleCrewMember(c *gin.Context) {
+func getCrewMember(c *gin.Context) {
 	var crewMember crewMemberInfo
 
 	crewMember.Crew_id = c.Param("id")
@@ -72,7 +73,7 @@ func handleCrewMember(c *gin.Context) {
 	})
 }
 
-func handleEntireCrew(c *gin.Context) {
+func getEntireCrew(c *gin.Context) {
 	var allCrew entireCompliment
 
 	_, err := databaseConnection()
@@ -105,7 +106,7 @@ func handleEntireCrew(c *gin.Context) {
 	c.JSON(200, allCrew)
 }
 
-func handleCount(c *gin.Context) {
+func getCount(c *gin.Context) {
 
 	var count int
 
@@ -141,6 +142,42 @@ func handleCount(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"crew_count": count,
 	})
+}
+
+func postCrew(c *gin.Context) {
+	var postedCrew entireCompliment
+
+	if err := postedCrew.checkPostedCrew(c); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"post_data_error": err.Error()})
+		return
+	}
+
+	ctx, err := databaseConnection()
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": err.Error()},
+		)
+	}
+	defer closeDatabaseConnection()
+
+	var tsql string = "INSERT INTO [dbo].[EnterpriseComplement] (crew_id, crew_info, date_inserted) VALUES "
+
+	for _, crewMember := range postedCrew {
+		jsonStr, err := json.Marshal(crewMember.Data)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"post_data_error": err.Error()})
+			return
+		}
+		tsql += fmt.Sprintf("('%s','%s', CURRENT_TIMESTAMP), ", crewMember.Crew_id, jsonStr)
+	}
+
+	tsql = tsql[:len(tsql)-2] + ";"
+	result, err := db.ExecContext(ctx, tsql)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+	}
+
+	c.JSON(200, gin.H{"message": result})
 }
 
 func databaseConnection() (context.Context, error) {
@@ -258,6 +295,14 @@ func (crewMember *crewMemberInfo) checkCrewMember(rows *sql.Rows) error {
 
 		// Create a crewMemberInfo object
 		crewMember.Data = crewData
+	}
+	return nil
+}
+
+func (postedCrew *entireCompliment) checkPostedCrew(c *gin.Context) error {
+
+	if err := c.BindJSON(&postedCrew); err != nil {
+		return err
 	}
 	return nil
 }
